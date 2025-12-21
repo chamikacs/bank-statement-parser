@@ -187,7 +187,10 @@ export default function Home() {
 
             {/* Upload Area */}
             <div className="max-w-2xl mx-auto">
-              <PDFUploader onFileSelect={handleFileSelect} />
+              <PDFUploader 
+                onFileSelect={handleFileSelect}
+                onFileRemove={handleReset}
+              />
             </div>
 
             {/* Feature Highlights */}
