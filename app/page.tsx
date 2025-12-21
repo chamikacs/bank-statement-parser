@@ -21,37 +21,40 @@ import type { Transaction, ParseMetadata } from '@/types/transaction';
 export default function Home() {
   const [appState, setAppState] = useState<AppState>({ status: 'empty' });
 
-  // Mock file upload handler (will be replaced with real implementation)
+  // Real file upload handler with PDF extraction
   const handleFileSelect = async (file: File) => {
     try {
-      // Set loading state
+      // Step 1: Extract text from PDF
       setAppState({
         status: 'loading',
         step: 1,
-        message: 'Extracting text from PDF...',
+        message: 'Loading PDF document...',
         progress: 0,
       });
 
-      // Simulate step 1
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setAppState({
-        status: 'loading',
-        step: 1,
-        message: 'Reading PDF pages...',
-        progress: 30,
+      const { extractPdfText } = await import('@/lib/pdf');
+      
+      const extractionResult = await extractPdfText(file, {
+        onProgress: (progress) => {
+          setAppState({
+            status: 'loading',
+            step: 1,
+            message: progress.message,
+            progress: Math.min(progress.percentage, 30), // Cap at 30% for extraction phase
+          });
+        },
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Simulate step 2
+      // Step 2: Parse transactions (mock for now)
       setAppState({
         status: 'loading',
         step: 2,
         message: 'Analyzing transaction patterns...',
-        progress: 50,
+        progress: 40,
       });
 
       await new Promise((resolve) => setTimeout(resolve, 1000));
+
       setAppState({
         status: 'loading',
         step: 2,
@@ -61,7 +64,7 @@ export default function Home() {
 
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      // Simulate step 3
+      // Step 3: Validate (mock for now)
       setAppState({
         status: 'loading',
         step: 3,
@@ -69,9 +72,9 @@ export default function Home() {
         progress: 90,
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
-      // Mock successful parsing
+      // Mock successful parsing (will be replaced with real parser)
       const mockTransactions: Transaction[] = [
         {
           date: '2024-01-15',
@@ -111,9 +114,9 @@ export default function Home() {
       ];
 
       const mockMetadata: ParseMetadata = {
-        totalLines: 50,
-        parsedLines: 45,
-        skippedLines: 5,
+        totalLines: extractionResult.text.split('\n').length,
+        parsedLines: mockTransactions.length,
+        skippedLines: extractionResult.text.split('\n').length - mockTransactions.length,
         parseDate: new Date().toISOString(),
       };
 
@@ -124,12 +127,25 @@ export default function Home() {
         fileName: file.name,
       });
     } catch (error) {
-      setAppState({
-        status: 'error',
-        message: 'Failed to parse PDF file',
-        details: error instanceof Error ? error.message : 'Unknown error occurred',
-        canRetry: true,
-      });
+      console.error('Extraction error:', error);
+      
+      // Handle PDFExtractionError
+      if (error instanceof Error && error.name === 'PDFExtractionError') {
+        const pdfError = error as unknown as { code: string; details?: string };
+        setAppState({
+          status: 'error',
+          message: error.message,
+          details: pdfError.details,
+          canRetry: pdfError.code !== 'PASSWORD_PROTECTED',
+        });
+      } else {
+        setAppState({
+          status: 'error',
+          message: 'Failed to process PDF',
+          details: error instanceof Error ? error.message : 'An unknown error occurred',
+          canRetry: true,
+        });
+      }
     }
   };
 
