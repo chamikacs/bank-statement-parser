@@ -45,7 +45,7 @@ export default function Home() {
         },
       });
 
-      // Step 2: Parse transactions (mock for now)
+      // Step 2: Parse transactions
       setAppState({
         status: 'loading',
         step: 2,
@@ -53,18 +53,13 @@ export default function Home() {
         progress: 40,
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      setAppState({
-        status: 'loading',
-        step: 2,
-        message: 'Parsing dates and amounts...',
-        progress: 70,
+      const { parseTransactions } = await import('@/lib/parser');
+      const parseResult = await parseTransactions(extractionResult.text, {
+        minConfidence: 60,
+        dateFormat: 'auto',
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Step 3: Validate (mock for now)
+      // Step 3: Validate
       setAppState({
         status: 'loading',
         step: 3,
@@ -74,56 +69,21 @@ export default function Home() {
 
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      // Mock successful parsing (will be replaced with real parser)
-      const mockTransactions: Transaction[] = [
-        {
-          date: '2024-01-15',
-          description: 'Grocery Store Purchase - Whole Foods',
-          debit: 125.50,
-          balance: 2450.75,
-          rawLine: '15/01/2024 Grocery Store Purchase - Whole Foods -125.50 2450.75',
-        },
-        {
-          date: '2024-01-16',
-          description: 'Salary Deposit - ACME Corp',
-          credit: 3500.00,
-          balance: 5950.75,
-          rawLine: '16/01/2024 Salary Deposit - ACME Corp +3500.00 5950.75',
-        },
-        {
-          date: '2024-01-17',
-          description: 'Utility Bill Payment - Electric Company',
-          debit: 89.25,
-          balance: 5861.50,
-          rawLine: '17/01/2024 Utility Bill Payment - Electric Company -89.25 5861.50',
-        },
-        {
-          date: '2024-01-18',
-          description: 'Online Purchase - Amazon.com',
-          debit: 45.99,
-          balance: 5815.51,
-          rawLine: '18/01/2024 Online Purchase - Amazon.com -45.99 5815.51',
-        },
-        {
-          date: '2024-01-20',
-          description: 'ATM Withdrawal',
-          debit: 100.00,
-          balance: 5715.51,
-          rawLine: '20/01/2024 ATM Withdrawal -100.00 5715.51',
-        },
-      ];
+      // Check if we got any transactions
+      if (parseResult.transactions.length === 0) {
+        throw new Error('No transactions found in PDF. Please ensure the PDF contains transaction data.');
+      }
 
-      const mockMetadata: ParseMetadata = {
-        totalLines: extractionResult.text.split('\n').length,
-        parsedLines: mockTransactions.length,
-        skippedLines: extractionResult.text.split('\n').length - mockTransactions.length,
-        parseDate: new Date().toISOString(),
-      };
-
+      // Success - show results
       setAppState({
         status: 'success',
-        transactions: mockTransactions,
-        metadata: mockMetadata,
+        transactions: parseResult.transactions,
+        metadata: {
+          totalLines: parseResult.metadata.totalLines,
+          parsedLines: parseResult.metadata.parsedTransactions,
+          skippedLines: parseResult.metadata.skippedLines,
+          parseDate: parseResult.metadata.parseDate,
+        },
         fileName: file.name,
       });
     } catch (error) {
