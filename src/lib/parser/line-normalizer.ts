@@ -121,10 +121,70 @@ export function filterNoiseLines(lines: string[]): string[] {
 }
 
 /**
+ * Split text into lines, with fallback for poorly formatted PDFs
+ * 
+ * Some PDFs don't preserve line breaks properly, so we need to detect
+ * transaction boundaries by looking for date patterns.
+ */
+function smartSplitLines(text: string): string[] {
+  // First, try normal line splitting
+  let lines = text.split('\n');
+  
+  // If we got very few lines (< 5) but text is long, 
+  // the PDF probably doesn't have proper line breaks
+  if (lines.length < 5 && text.length > 500) {
+    console.log('⚠️ [PARSER] PDF has poor line breaks, using smart splitting...');
+    
+    // Try to split by date patterns
+    // Common bank statement date formats at line start
+    const datePatterns = [
+      /(\d{1,2}\/\d{1,2}\/\d{2,4})/g,  // DD/MM/YY or DD/MM/YYYY
+      /(\d{4}-\d{2}-\d{2})/g,           // YYYY-MM-DD
+    ];
+    
+    let bestSplit = lines;
+    
+    for (const pattern of datePatterns) {
+      const parts: string[] = [];
+      let lastIndex = 0;
+      const matches = text.matchAll(pattern);
+      
+      for (const match of matches) {
+        if (match.index && match.index > lastIndex) {
+          const chunk = text.substring(lastIndex, match.index).trim();
+          if (chunk.length > 0) {
+            parts.push(chunk);
+          }
+          lastIndex = match.index;
+        }
+      }
+      
+      // Add the last chunk
+      if (lastIndex < text.length) {
+        const chunk = text.substring(lastIndex).trim();
+        if (chunk.length > 0) {
+          parts.push(chunk);
+        }
+      }
+      
+      // Use this split if it produced more lines
+      if (parts.length > bestSplit.length) {
+        bestSplit = parts;
+        console.log('✅ [PARSER] Smart split produced', parts.length, 'lines');
+      }
+    }
+    
+    lines = bestSplit;
+  }
+  
+  return lines;
+}
+
+/**
  * Complete line normalization pipeline
  * 
  * Applies all normalization steps:
- * 1. Split into lines
+ * 1. Smart split into lines (handles poor line breaks)
  * 2. Normalize each line
  * 3. Filter noise
  * 4. Remove empty results
@@ -140,8 +200,8 @@ export function filterNoiseLines(lines: string[]): string[] {
  * ```
  */
 export function normalizeLines(text: string): string[] {
-  // Step 1: Split into lines
-  const lines = splitIntoLines(text);
+  // Step 1: Smart split into lines
+  const lines = smartSplitLines(text);
   
   // Step 2: Normalize each line
   const normalizedLines = lines.map(normalizeLine);

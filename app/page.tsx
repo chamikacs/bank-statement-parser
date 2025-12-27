@@ -10,7 +10,6 @@ import {
 } from '@/components/converter';
 import { Button, Alert, Card } from '@/components/ui';
 import type { AppState } from '@/types/app-state';
-import type { Transaction, ParseMetadata } from '@/types/transaction';
 
 /**
  * Main Application Page
@@ -54,10 +53,29 @@ export default function Home() {
       });
 
       const { parseTransactions } = await import('@/lib/parser');
+      
+      console.log('📄 Starting transaction parsing...');
+      console.log('📊 Extracted text preview:', extractionResult.text.substring(0, 500));
+      
       const parseResult = await parseTransactions(extractionResult.text, {
-        minConfidence: 60,
+        minConfidence: 50, // Lowered to accept more valid transactions
         dateFormat: 'auto',
       });
+      
+      console.log('✅ Parsing complete!');
+      console.log('📊 Parse result:', {
+        transactions: parseResult.transactions.length,
+        skipped: parseResult.skipped.length,
+        metadata: parseResult.metadata
+      });
+      
+      if (parseResult.transactions.length > 0) {
+        console.log('📝 Sample transaction:', parseResult.transactions[0]);
+      }
+      
+      if (parseResult.skipped.length > 0) {
+        console.log('⚠️ Skipped lines sample:', parseResult.skipped.slice(0, 3));
+      }
 
       // Step 3: Validate
       setAppState({

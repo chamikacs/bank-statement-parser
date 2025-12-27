@@ -14,39 +14,45 @@ import type { ExtractedAmount } from '../types';
 const AMOUNT_EXTRACTION_PATTERNS = [
   {
     // Parentheses indicate negative (debit): (1,234.56) or ($1,234.56)
-    pattern: /\((?:[$£€₹])?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)\)/,
+    pattern: /\((?:[$£€₹])?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)\)/g,
     isDebit: true,
     confidence: 95,
   },
   {
     // Explicit negative sign: -$1,234.56 or -1234.56
-    pattern: /(?:^|\s)-\s*(?:[$£€₹])?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/,
+    pattern: /-\s*(?:[$£€₹])?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/g,
     isDebit: true,
     confidence: 95,
   },
   {
     // DR suffix (debit): 1,234.56 DR
-    pattern: /(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)\s*DR\b/i,
+    pattern: /(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)\s+DR\b/gi,
     isDebit: true,
     confidence: 100,
   },
   {
-    // CR suffix (credit): 1,234.56 CR
-    pattern: /(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)\s*CR\b/i,
+    // CR suffix (credit): 1,234.56 CR or at end of line
+    pattern: /(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)\s+CR\b/gi,
     isDebit: false,
     confidence: 100,
   },
   {
     // Standard format with currency symbol: $1,234.56 or £1234.56
-    pattern: /(?:^|\s)([$£€₹])\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/,
+    pattern: /(?:[$£€₹])\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/g,
     isDebit: null, // Ambiguous - need context
     confidence: 70,
   },
   {
-    // Standard format without currency: 1,234.56 or 1234.56
-    pattern: /(?:^|\s)(\d{1,3}(?:,\d{3})*(?:\.\d{2}))(?:\s|$)/,
+    // Standard format with commas: 1,234.56
+    pattern: /\b(\d{1,3}(?:,\d{3})+(?:\.\d{2})?)\b/g,
     isDebit: null, // Ambiguous - need context
     confidence: 60,
+  },
+  {
+    // Standard format without commas: 1234.56 or 1234.00
+    pattern: /\b(\d{3,}(?:\.\d{2})?)\b/g,
+    isDebit: null, // Ambiguous - need context
+    confidence: 55,
   },
 ];
 
@@ -81,9 +87,15 @@ function parseAmount(amountStr: string): number {
 export function extractAmounts(line: string): ExtractedAmount[] {
   const results: Array<ExtractedAmount & { position: number }> = [];
   
+  // Check if line ends with Cr or Dr to classify amounts
+  const endsWithCr = /\bCR\s*$/i.test(line);
+  const endsWithDr = /\bDR\s*$/i.test(line);
+  
+  console.log('  🔍 Checking line for Cr/Dr:', { line, endsWithCr, endsWithDr });
+  
   // Try each pattern
   for (const { pattern, isDebit: defaultIsDebit, confidence: baseConfidence } of AMOUNT_EXTRACTION_PATTERNS) {
-    const matches = line.matchAll(new RegExp(pattern, 'g'));
+    const matches = line.matchAll(pattern);
     
     for (const match of matches) {
       // Get the amount string (last captured group)
@@ -94,13 +106,24 @@ export function extractAmounts(line: string): ExtractedAmount[] {
       if (value <= 0 || value > 10000000) continue; // Skip invalid amounts
       
       // Determine debit/credit
-      const isDebit = defaultIsDebit ?? false;
-      const isCredit = defaultIsDebit === false; // Only true if explicitly credit
+      let isDebit = defaultIsDebit;
+      let isCredit = defaultIsDebit === false;
+      
+      // If pattern didn't specify and line ends with Cr/Dr, use that
+      if (isDebit === null) {
+        if (endsWithCr) {
+          isDebit = false;
+          isCredit = true;
+        } else if (endsWithDr) {
+          isDebit = true;
+          isCredit = false;
+        }
+      }
       
       results.push({
         value,
         original: match[0].trim(),
-        isDebit,
+        isDebit: isDebit ?? false,
         isCredit,
         confidence: baseConfidence,
         position: match.index || 0,
@@ -126,6 +149,8 @@ export function extractAmounts(line: string): ExtractedAmount[] {
       deduped.push(amount);
     }
   }
+  
+  console.log('  📊 Extracted amounts:', deduped.map(a => ({ value: a.value, isCredit: a.isCredit, isDebit: a.isDebit })));
   
   return deduped;
 }

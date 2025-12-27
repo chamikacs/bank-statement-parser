@@ -41,20 +41,27 @@ function parseLine(
   const dateResult = extractDate(line, preferDDMM);
   
   if (!dateResult) {
+    console.log('  ❌ No date found in line:', line);
     return null; // Can't parse without date
   }
+  
+  console.log('  ✅ Date extracted:', dateResult.value, '(confidence:', dateResult.confidence + '%)');
   
   // Layer 3b: Extract amounts
   const amounts = extractAmounts(line);
   const { transactionAmount, balance: balanceAmount } = classifyAmounts(amounts);
   
+  console.log('  💰 Amounts found:', amounts.length, '- Transaction:', transactionAmount?.value, 'Balance:', balanceAmount?.value);
+  
   if (!transactionAmount) {
+    console.log('  ❌ No transaction amount found');
     return null; // Can't parse without amount
   }
   
   // Layer 3c: Extract description
   const amountTexts = amounts.map((a) => a.original);
   const description = extractDescription(line, dateResult.original, amountTexts);
+  console.log('  📝 Description:', description);
   
   // Layer 3d: Extract balance
   const balanceResult = balanceAmount || extractBalance(line, transactionAmount.original);
@@ -98,20 +105,34 @@ export async function parseTransactions(
   text: string,
   options: ParsingOptions = {}
 ): Promise<ParsingResult> {
+  console.log('🔍 [PARSER] Starting transaction parsing...');
+  console.log('📝 [PARSER] Input text length:', text.length, 'characters');
+  console.log('⚙️ [PARSER] Options:', options);
+  
   // Set defaults
   const opts: Required<ParsingOptions> = {
-    minConfidence: options.minConfidence ?? 60,
+    minConfidence: options.minConfidence ?? 50, // Lowered from 60 to accept more valid transactions
     dateFormat: options.dateFormat ?? 'auto',
     strict: options.strict ?? false,
   };
   
+  console.log('\n📋 [LAYER 1] Normalizing lines...');
   // Layer 1: Normalize lines
   const normalized = normalizeLines(text);
+  console.log('✅ [LAYER 1] Normalized lines count:', normalized.length);
+  console.log('📄 [LAYER 1] First 5 lines:', normalized.slice(0, 5));
   
+  console.log('\n🎯 [LAYER 2] Detecting candidate transaction lines...');
   // Layer 2: Detect candidates
   const candidates = detectCandidates(normalized);
   const likelyCandidates = filterLikelyCandidates(candidates);
+  console.log('✅ [LAYER 2] Total candidates:', candidates.length);
+  console.log('✅ [LAYER 2] Likely transaction candidates:', likelyCandidates.length);
+  if (likelyCandidates.length > 0) {
+    console.log('📄 [LAYER 2] First candidate:', likelyCandidates[0]);
+  }
   
+  console.log('\n⚙️ [LAYER 3 & 4] Parsing and validating candidates...');
   // Layer 3 & 4: Parse each candidate
   const parsed: ParsedTransaction[] = [];
   const skipped: SkippedLine[] = [];
@@ -120,6 +141,7 @@ export async function parseTransactions(
     const transaction = parseLine(candidate.line, candidate.lineNumber, opts);
     
     if (!transaction) {
+      console.log('❌ [PARSER] Failed to parse line', candidate.lineNumber + ':', candidate.line);
       skipped.push({
         line: candidate.line,
         lineNumber: candidate.lineNumber,
@@ -131,8 +153,10 @@ export async function parseTransactions(
     
     // Check if meets minimum confidence
     if (isValidTransaction(transaction, opts.minConfidence)) {
+      console.log('✅ [PARSER] Accepted transaction (confidence:', transaction.confidence + '%):', transaction.description);
       parsed.push(transaction);
     } else {
+      console.log('⚠️ [PARSER] Rejected low-confidence transaction (', transaction.confidence + '%):', transaction.description);
       skipped.push({
         line: candidate.line,
         lineNumber: candidate.lineNumber,
@@ -141,6 +165,10 @@ export async function parseTransactions(
       });
     }
   }
+  
+  console.log('\n📊 [RESULTS] Parsing complete!');
+  console.log('✅ Accepted transactions:', parsed.length);
+  console.log('❌ Skipped lines:', skipped.length);
   
   // Sort transactions by date (oldest first)
   const sorted = parsed.sort((a, b) => {
