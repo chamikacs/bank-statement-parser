@@ -87,11 +87,7 @@ function parseAmount(amountStr: string): number {
 export function extractAmounts(line: string): ExtractedAmount[] {
   const results: Array<ExtractedAmount & { position: number }> = [];
   
-  // Check if line ends with Cr or Dr to classify amounts
-  const endsWithCr = /\bCR\s*$/i.test(line);
-  const endsWithDr = /\bDR\s*$/i.test(line);
-  
-  console.log('  🔍 Checking line for Cr/Dr:', { line, endsWithCr, endsWithDr });
+  console.log('  🔍 Analyzing line for amounts:', line);
   
   // Try each pattern
   for (const { pattern, isDebit: defaultIsDebit, confidence: baseConfidence } of AMOUNT_EXTRACTION_PATTERNS) {
@@ -105,20 +101,12 @@ export function extractAmounts(line: string): ExtractedAmount[] {
       // Validate amount (must be reasonable)
       if (value <= 0 || value > 10000000) continue; // Skip invalid amounts
       
-      // Determine debit/credit
-      let isDebit = defaultIsDebit;
-      let isCredit = defaultIsDebit === false;
+      // Determine debit/credit based on the pattern match
+      const isDebit = defaultIsDebit ?? false;
+      const isCredit = defaultIsDebit === false;
       
-      // If pattern didn't specify and line ends with Cr/Dr, use that
-      if (isDebit === null) {
-        if (endsWithCr) {
-          isDebit = false;
-          isCredit = true;
-        } else if (endsWithDr) {
-          isDebit = true;
-          isCredit = false;
-        }
-      }
+      // For the Cr/Dr suffix patterns, the pattern itself already captures it correctly
+      // Don't override based on line ending
       
       results.push({
         value,
@@ -159,6 +147,7 @@ export function extractAmounts(line: string): ExtractedAmount[] {
  * Classify amounts as transaction amount vs balance
  * 
  * Heuristic: In most bank statements, the last amount is balance
+ * For statements with PAYMENTS and RECEIPTS columns, we need to look at patterns
  * 
  * @param amounts - All extracted amounts
  * @returns Object with transaction amount and balance
@@ -176,20 +165,21 @@ export function classifyAmounts(amounts: ExtractedAmount[]): {
     return { transactionAmount: amounts[0], balance: null };
   }
   
-  // Multiple amounts: last is likely balance, others are transaction
+  // Multiple amounts: last is likely balance, first/middle is transaction
   const balance = amounts[amounts.length - 1];
   
   // If we have exactly 2 amounts, first is transaction
   if (amounts.length === 2) {
-    return { transactionAmount: amounts[0], balance };
+    const transaction = amounts[0];
+    
+    // Important: Don't let the balance's Cr/Dr classification override the transaction
+    // The transaction amount should keep its original classification
+    return { transactionAmount: transaction, balance };
   }
   
   // More than 2: could be debit+credit+balance or multiple transactions
-  // For now, take the largest non-balance amount
-  const nonBalanceAmounts = amounts.slice(0, -1);
-  const transactionAmount = nonBalanceAmounts.reduce((max, curr) =>
-    curr.value > max.value ? curr : max
-  );
+  // For now, take the first non-balance amount
+  const transactionAmount = amounts[0];
   
   return { transactionAmount, balance };
 }

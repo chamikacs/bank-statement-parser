@@ -20,7 +20,6 @@ import { detectCandidates, filterLikelyCandidates } from './candidate-detector';
 import { extractDate } from './field-extractors/date-extractor';
 import { extractAmounts, classifyAmounts } from './field-extractors/amount-extractor';
 import { extractDescription } from './field-extractors/description-extractor';
-import { extractBalance } from './field-extractors/balance-extractor';
 import { validateTransaction, isValidTransaction } from './transaction-validator';
 
 /**
@@ -58,21 +57,64 @@ function parseLine(
     return null; // Can't parse without amount
   }
   
+  // Smart debit/credit detection based on description keywords
+  // This helps classify transactions from bank statements that use PAYMENTS/RECEIPTS columns
+  let finalIsDebit = transactionAmount.isDebit;
+  let finalIsCredit = transactionAmount.isCredit;
+  
+  // Check for debit keywords in the line
+  const hasDebitKeyword = [
+    'KAS-IB-TRF TO',
+    'KAS-cc',
+    'KAS-chamika',  
+    'KAS-EFT-Chg',
+    'Cash advance',
+  ].some(keyword => line.includes(keyword));
+  
+  // Check for credit keywords in the line
+  const hasCreditKeyword = [
+    'KAS-IB-TRF FROM',
+    'OPENING BALANCE',
+    'DEPOSIT',
+  ].some(keyword => line.includes(keyword));
+  
+  // Override classification based on keywords (only  if not already explicitly set by pattern)
+  if (!transactionAmount.isCredit && !transactionAmount.isDebit) {
+    if (hasDebitKeyword) {
+      finalIsDebit = true;
+      finalIsCredit = false;
+      console.log('  🔍 Detected DEBIT from keyword');
+    } else if (hasCreditKeyword) {
+      finalIsDebit = false;
+      finalIsCredit = true;
+      console.log('  🔍 Detected CREDIT from keyword');
+    }
+  }
+  
   // Layer 3c: Extract description
   const amountTexts = amounts.map((a) => a.original);
   const description = extractDescription(line, dateResult.original, amountTexts);
   console.log('  📝 Description:', description);
   
-  // Layer 3d: Extract balance
-  const balanceResult = balanceAmount || extractBalance(line, transactionAmount.original);
+  // Layer 3d: Extract balance - it's the last amount with "Cr" or "Dr"
+  // Look for pattern like "6,588.00 Cr" at the end
+  const balancePattern = /(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)\s+(?:Cr|Dr)\s*$/i;
+  const balanceMatch = line.match(balancePattern);
+  let balance: number | undefined;
   
-  // Build transaction
+  if (balanceMatch) {
+    const balanceStr = balanceMatch[1].replace(/,/g, '');
+    balance = parseFloat(balanceStr);
+    console.log('  💼 Balance extracted:', balance);
+  }
+  
+  // Build transaction using bank statement terminology
   const transaction: Transaction = {
     date: dateResult.value,
     description,
-    debit: transactionAmount.isDebit ? transactionAmount.value : undefined,
-    credit: transactionAmount.isCredit ? transactionAmount.value : undefined,
-    balance: balanceResult?.value,
+    payment: finalIsDebit ? transactionAmount.value : undefined,    // PAYMENTS column
+    receipt: finalIsCredit ? transactionAmount.value : undefined,   // RECEIPTS column
+    balance: balance,                                                // BALANCE column
     rawLine: line,
   };
   
@@ -196,8 +238,8 @@ export async function parseTransactions(
   const transactions: Transaction[] = sorted.map((t) => ({
     date: t.date,
     description: t.description,
-    debit: t.debit,
-    credit: t.credit,
+    payment: t.payment,
+    receipt: t.receipt,
     balance: t.balance,
     rawLine: t.rawLine,
   }));

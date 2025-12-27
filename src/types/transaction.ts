@@ -7,26 +7,31 @@
 export interface Transaction {
   /**
    * Transaction date in ISO 8601 format (YYYY-MM-DD)
+   * Corresponds to DATE column
    */
   date: string;
   
   /**
    * Transaction description/narrative
+   * Corresponds to PARTICULARS column
    */
   description: string;
   
   /**
-   * Debit amount (money out)
+   * Payment amount (money out)
+   * Corresponds to PAYMENTS column
    */
-  debit?: number;
+  payment?: number;
   
   /**
-   * Credit amount (money in)
+   * Receipt amount (money in)
+   * Corresponds to RECEIPTS column
    */
-  credit?: number;
+  receipt?: number;
   
   /**
    * Account balance after transaction
+   * Corresponds to BALANCE column
    */
   balance?: number;
   

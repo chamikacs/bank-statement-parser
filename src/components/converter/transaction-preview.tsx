@@ -30,10 +30,10 @@ export const TransactionPreview: React.FC<TransactionPreviewProps> = ({
   metadata,
   fileName,
 }) => {
-  // Calculate summary statistics
-  const totalCredits = transactions.reduce((sum, t) => sum + (t.credit || 0), 0);
-  const totalDebits = transactions.reduce((sum, t) => sum + (t.debit || 0), 0);
-  const netChange = totalCredits - totalDebits;
+  // Calculate summary statistics using bank statement terminology
+  const totalReceipts = transactions.reduce((sum, t) => sum + (t.receipt || 0), 0);
+  const totalPayments = transactions.reduce((sum, t) => sum + (t.payment || 0), 0);
+  const netChange = totalReceipts - totalPayments;
 
   // Get date range
   const dates = transactions.map((t) => new Date(t.date));
@@ -53,18 +53,18 @@ export const TransactionPreview: React.FC<TransactionPreviewProps> = ({
 
         <Card padding="md" shadow="sm">
           <div className="space-y-1">
-            <p className="text-sm text-muted-foreground">Total Credits</p>
+            <p className="text-sm text-muted-foreground">Total Receipts</p>
             <p className="text-3xl font-bold text-[var(--color-success-600)]">
-              {formatCurrency(totalCredits)}
+              {formatCurrency(totalReceipts)}
             </p>
           </div>
         </Card>
 
         <Card padding="md" shadow="sm">
           <div className="space-y-1">
-            <p className="text-sm text-muted-foreground">Total Debits</p>
+            <p className="text-sm text-muted-foreground">Total Payments</p>
             <p className="text-3xl font-bold text-[var(--color-error-600)]">
-              {formatCurrency(totalDebits)}
+              {formatCurrency(totalPayments)}
             </p>
           </div>
         </Card>
@@ -130,9 +130,9 @@ export const TransactionPreview: React.FC<TransactionPreviewProps> = ({
             <TableHeader>
               <TableRow>
                 <TableHead>Date</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead align="right">Debit</TableHead>
-                <TableHead align="right">Credit</TableHead>
+                <TableHead>Particulars</TableHead>
+                <TableHead align="right">Payments</TableHead>
+                <TableHead align="right">Receipts</TableHead>
                 <TableHead align="right">Balance</TableHead>
               </TableRow>
             </TableHeader>
@@ -148,18 +148,18 @@ export const TransactionPreview: React.FC<TransactionPreviewProps> = ({
                     <span className="line-clamp-2">{transaction.description}</span>
                   </TableCell>
                   <TableCell align="right">
-                    {transaction.debit ? (
+                    {transaction.payment ? (
                       <span className="text-[var(--color-error-600)] font-medium font-mono">
-                        {formatCurrency(transaction.debit)}
+                        {formatCurrency(transaction.payment)}
                       </span>
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
                   </TableCell>
                   <TableCell align="right">
-                    {transaction.credit ? (
+                    {transaction.receipt ? (
                       <span className="text-[var(--color-success-600)] font-medium font-mono">
-                        {formatCurrency(transaction.credit)}
+                        {formatCurrency(transaction.receipt)}
                       </span>
                     ) : (
                       <span className="text-muted-foreground">—</span>

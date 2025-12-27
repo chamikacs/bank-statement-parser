@@ -130,15 +130,15 @@ export default function Home() {
   const handleExport = () => {
     if (appState.status !== 'success') return;
 
-    // Mock CSV export (will be replaced with real implementation)
+    // CSV export with bank statement column names
     const csv = [
-      'Date,Description,Debit,Credit,Balance',
+      'Date,Particulars,Payments,Receipts,Balance',
       ...appState.transactions.map((t) =>
         [
           t.date,
           `"${t.description}"`,
-          t.debit || '',
-          t.credit || '',
+          t.payment || '',
+          t.receipt || '',
           t.balance || '',
         ].join(',')
       ),

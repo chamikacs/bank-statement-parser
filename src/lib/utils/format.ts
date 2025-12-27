@@ -6,11 +6,16 @@
 
 /**
  * Format a number as currency
+ * 
+ * @param amount - Amount to format
+ * @param currency - Currency code (default: LKR for Sri Lankan Rupee)
  */
-export function formatCurrency(amount: number, currency: string = 'USD'): string {
-  return new Intl.NumberFormat('en-US', {
+export function formatCurrency(amount: number, currency: string = 'LKR'): string {
+  return new Intl.NumberFormat('en-LK', {
     style: 'currency',
     currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(amount);
 }
 

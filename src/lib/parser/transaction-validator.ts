@@ -37,13 +37,13 @@ export function calculateConfidenceFactors(transaction: Transaction): Confidence
  // Check if date is in reasonable range (not future, not too old)
   const dateInReasonableRange = hasValidDate && isDateReasonable(transaction.date);
   
-  // Check if has at least one amount
-  const hasAmount = Boolean(transaction.debit || transaction.credit);
+  // Check if has at least one amount (payment or receipt)
+  const hasAmount = Boolean(transaction.payment || transaction.receipt);
   
   // Check if amount format is valid (positive number)
   const amountFormatValid = Boolean(
-    (transaction.debit === undefined || transaction.debit >= 0) &&
-    (transaction.credit === undefined || transaction.credit >= 0)
+    (transaction.payment === undefined || transaction.payment >= 0) &&
+    (transaction.receipt === undefined || transaction.receipt >= 0)
   );
   
   // Check if has meaningful description
@@ -164,20 +164,23 @@ export function validateTransaction(transaction: Transaction): ParsedTransaction
 /**
  * Check if transaction passes minimum requirements
  * 
- * @param transaction - Parsed transaction
- * @param minConfidence - Minimum confidence threshold (default: 60)
+ * @param transaction - Parsed transaction  
+ * @param minConfidence - Minimum confidence threshold (default: 50)
  * @returns True if transaction is acceptable
  */
 export function isValidTransaction(
   transaction: ParsedTransaction,
-  minConfidence: number = 60
+  minConfidence: number = 50
 ): boolean {
   // Must meet minimum confidence
   if (transaction.confidence < minConfidence) return false;
   
-  // Must have required fields
+  // Must have date - this is critical
   if (!transaction.factors.hasValidDate) return false;
+  
+  // Must have amount - this is critical
   if (!transaction.factors.hasAmount) return false;
   
+  // Everything else is optional - balance and description are nice to have but not required
   return true;
 }
