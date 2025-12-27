@@ -46,8 +46,8 @@ function parseLine(
   
   console.log('  ✅ Date extracted:', dateResult.value, '(confidence:', dateResult.confidence + '%)');
   
-  // Layer 3b: Extract amounts
-  const amounts = extractAmounts(line);
+  // Layer 3b: Extract amounts (pass date to help isolate amounts section)
+  const amounts = extractAmounts(line, dateResult.original);
   const { transactionAmount, balance: balanceAmount } = classifyAmounts(amounts);
   
   console.log('  💰 Amounts found:', amounts.length, '- Transaction:', transactionAmount?.value, 'Balance:', balanceAmount?.value);
