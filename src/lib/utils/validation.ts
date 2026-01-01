@@ -37,3 +37,57 @@ export function isValidISODate(dateString: string): boolean {
 export function isPDF(file: File): boolean {
   return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
 }
+
+/**
+ * Format file size in human-readable format
+ */
+export function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '0 Bytes';
+  
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+}
+
+/**
+ * Validate PDF file with detailed error messages
+ */
+export interface FileValidationResult {
+  valid: boolean;
+  error?: string;
+  errorDetails?: string;
+}
+
+export function validatePDFFile(file: File, maxSizeMB: number = 10): FileValidationResult {
+  // Check file type
+  if (!isPDF(file)) {
+    return {
+      valid: false,
+      error: 'Invalid file type',
+      errorDetails: 'Please select a PDF file. Other file formats are not supported.',
+    };
+  }
+
+  // Check file size
+  const maxBytes = maxSizeMB * 1024 * 1024;
+  if (file.size > maxBytes) {
+    return {
+      valid: false,
+      error: 'File too large',
+      errorDetails: `File size is ${formatFileSize(file.size)}. Maximum allowed size is ${maxSizeMB}MB.`,
+    };
+  }
+
+  // Check if file is empty
+  if (file.size === 0) {
+    return {
+      valid: false,
+      error: 'Empty file',
+      errorDetails: 'The selected file appears to be empty. Please select a valid PDF file.',
+    };
+  }
+
+  return { valid: true };
+}
